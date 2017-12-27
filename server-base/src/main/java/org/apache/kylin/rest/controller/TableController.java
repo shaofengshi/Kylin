@@ -83,12 +83,30 @@ public class TableController extends BasicController {
         }
     }
 
+    /**
+     * Get available table list of the input database
+     * Keep this api so that user could rolling upgrade to v2.2.0 when user have dozens of QueryServer
+     *
+     * @return Table metadata array
+     * @throws IOException
+     */
+    @RequestMapping(value = "/{tableName:.+}", method = { RequestMethod.GET }, produces = { "application/json" })
+    @ResponseBody
+    @Deprecated
+    public TableDesc getTableDesc(@PathVariable String tableName) {
+        TableDesc table = tableService.getTableDescByName(tableName, false, null);
+        if (table == null)
+            throw new NotFoundException("Could not find Hive table: " + tableName);
+        return table;
+    }
+
     // FIXME prj-table
     /**
      * Get available table list of the input database
      *
      * @return Table metadata array
      * @throws IOException
+     * @since 2.2.0
      */
     @RequestMapping(value = "/{project}/{tableName:.+}", method = { RequestMethod.GET }, produces = { "application/json" })
     @ResponseBody

@@ -39,11 +39,12 @@ import org.apache.kylin.cube.model.CubeDesc;
 import org.apache.kylin.job.dao.ExecutableDao;
 import org.apache.kylin.job.dao.ExecutablePO;
 import org.apache.kylin.job.exception.PersistentException;
-import org.apache.kylin.metadata.TableMetadataManager;
 import org.apache.kylin.metadata.badquery.BadQueryHistoryManager;
 import org.apache.kylin.metadata.model.DataModelDesc;
 import org.apache.kylin.metadata.model.DataModelManager;
 import org.apache.kylin.metadata.model.SegmentStatusEnum;
+import org.apache.kylin.metadata.model.TableDesc;
+import org.apache.kylin.metadata.model.TableExtDesc;
 import org.apache.kylin.metadata.model.TableRef;
 import org.apache.kylin.metadata.project.ProjectInstance;
 import org.apache.kylin.metadata.project.ProjectManager;
@@ -377,10 +378,8 @@ public class CubeMetaExtractor extends AbstractInfoExtractor {
         if (modelDesc != null) {
             //fixme should get all tbls in prj not only in cubes when back up by prj.
             for (TableRef tableRef : modelDesc.getAllTables()) {
-                addRequired(tableRef.getTableDesc().getResourcePath());
-                addOptional(TableMetadataManager.getInstance(KylinConfig.getInstanceFromEnv()) //
-                        .getTableExt(tableRef.getTableDesc()) //
-                        .getResourcePath()); //
+                addRequired(TableDesc.concatResourcePath(tableRef.getTableIdentity(), tableRef.getTableDesc().getProject()));
+                addOptional(TableExtDesc.concatResourcePath(tableRef.getTableIdentity(), tableRef.getTableDesc().getProject())); //
             }
             addRequired(DataModelDesc.concatResourcePath(modelDesc.getName()));
         }
