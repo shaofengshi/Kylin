@@ -242,7 +242,7 @@ public class SparkCubingByLayer extends AbstractApplication implements Serializa
         }
         allRDDs[totalLevels].unpersist();
         logger.info("Finished on calculating all level cuboids.");
-        deleteHDFSMeta(metaUrl);
+        //        deleteHDFSMeta(metaUrl);
     }
 
     protected void setHadoopConf(Job job, CubeSegment segment, String metaUrl) throws Exception {

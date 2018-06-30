@@ -20,7 +20,6 @@ package org.apache.kylin.engine.spark;
 
 import org.apache.kylin.common.KylinConfig;
 import org.apache.kylin.common.StorageURL;
-import org.apache.kylin.common.util.ClassUtil;
 import org.apache.kylin.common.util.StringUtil;
 import org.apache.kylin.cube.CubeSegment;
 import org.apache.kylin.engine.EngineFactory;
@@ -58,16 +57,6 @@ public class SparkBatchCubingJobBuilder2 extends BatchCubingJobBuilder2 {
 
     }
 
-    private static String findJar(String className, String perferLibraryName) {
-        try {
-            return ClassUtil.findContainingJar(Class.forName(className), perferLibraryName);
-        } catch (ClassNotFoundException e) {
-            logger.warn("failed to locate jar for class " + className + ", ignore it");
-        }
-
-        return "";
-    }
-
     public void configureSparkJob(final CubeSegment seg, final SparkExecutable sparkExecutable,
             final String jobId, final String cuboidRootPath) {
         final IJoinedFlatTableDesc flatTableDesc = EngineFactory.getJoinedFlatTableDesc(seg);
@@ -90,7 +79,7 @@ public class SparkBatchCubingJobBuilder2 extends BatchCubingJobBuilder2 {
         sparkExecutable.setName(ExecutableConstants.STEP_NAME_BUILD_SPARK_CUBE);
     }
 
-    private String getSegmentMetadataUrl(KylinConfig kylinConfig, String jobId) {
+    public String getSegmentMetadataUrl(KylinConfig kylinConfig, String jobId) {
         Map<String, String> param = new HashMap<>();
         param.put("path", getDumpMetadataPath(jobId));
         return new StorageURL(kylinConfig.getMetadataUrl().getIdentifier(), "hdfs", param).toString();
