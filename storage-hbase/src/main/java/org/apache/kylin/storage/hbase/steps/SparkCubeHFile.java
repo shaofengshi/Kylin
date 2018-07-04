@@ -30,6 +30,7 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.Options;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.KeyValue;
@@ -52,7 +53,6 @@ import org.apache.kylin.cube.CubeSegment;
 import org.apache.kylin.cube.model.CubeDesc;
 import org.apache.kylin.cube.model.HBaseColumnDesc;
 import org.apache.kylin.cube.model.HBaseColumnFamilyDesc;
-import org.apache.kylin.engine.mr.BatchCubingJobBuilder2;
 import org.apache.kylin.engine.mr.common.AbstractHadoopJob;
 import org.apache.kylin.engine.mr.common.BatchConstants;
 import org.apache.kylin.engine.mr.common.SerializableConfiguration;
@@ -64,6 +64,8 @@ import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.PairFlatMapFunction;
 import org.apache.spark.api.java.function.PairFunction;
+import org.apache.spark.scheduler.SparkListener;
+import org.apache.spark.scheduler.SparkListenerJobEnd;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,8 +119,8 @@ public class SparkCubeHFile extends AbstractApplication implements Serializable 
         final String outputPath = optionsHelper.getOptionValue(OPTION_OUTPUT_PATH);
         final Path partitionFilePath = new Path(optionsHelper.getOptionValue(OPTION_PARTITION_FILE_PATH));
 
-        Class[] kryoClassArray = new Class[] { Text.class, Class.forName("scala.reflect.ClassTag$$anon$1"), Class.class,
-                KeyValueCreator.class, KeyValue.class, RowKeyWritable.class };
+        Class[] kryoClassArray = new Class[] { Class.forName("scala.reflect.ClassTag$$anon$1"), KeyValueCreator.class,
+                KeyValue.class, RowKeyWritable.class };
 
         SparkConf conf = new SparkConf().setAppName("Covnerting Hfile for:" + cubeName + " segment " + segmentId);
         //serialization conf
@@ -127,6 +129,12 @@ public class SparkCubeHFile extends AbstractApplication implements Serializable 
         conf.set("spark.kryo.registrationRequired", "true").registerKryoClasses(kryoClassArray);
 
         JavaSparkContext sc = new JavaSparkContext(conf);
+        sc.sc().addSparkListener(new SparkListener() {
+            @Override
+            public void onJobEnd(SparkListenerJobEnd jobEnd) {
+                super.onJobEnd(jobEnd);
+            }
+        });
         FileSystem fs = partitionFilePath.getFileSystem(sc.hadoopConfiguration());
         if (!fs.exists(partitionFilePath)) {
             throw new IllegalArgumentException("File not exist: " + partitionFilePath.toString());
@@ -156,14 +164,22 @@ public class SparkCubeHFile extends AbstractApplication implements Serializable 
         logger.info("Input path: {}", inputPath);
         logger.info("Output path: {}", outputPath);
 
-        final int totalLevels = cubeSegment.getCuboidScheduler().getBuildLevel();
-        final JavaPairRDD<Text, Text>[] rddArray = new JavaPairRDD[totalLevels + 1];
-        for (int level = 0; level <= totalLevels; level++) {
-            String cuboidOutputPath = BatchCubingJobBuilder2.getCuboidOutputPathsByLevel(inputPath, level);
-            rddArray[level] = sc.sequenceFile(cuboidOutputPath, Text.class, Text.class);
+        List<JavaPairRDD> inputRDDs = Lists.newArrayList();
+        Path inputHDFSPath = new Path(inputPath);
+        FileStatus[] fileStatuses = fs.listStatus(inputHDFSPath);
+        boolean hasDir = false;
+        for (FileStatus stat : fileStatuses) {
+            if (stat.isDirectory() && !stat.getPath().getName().startsWith("_")) {
+                hasDir = true;
+                inputRDDs.add(sc.sequenceFile(stat.getPath().toString(), Text.class, Text.class));
+            }
         }
 
-        final JavaPairRDD<Text, Text> allCuboidFile = sc.union(rddArray);
+        if (!hasDir) {
+            inputRDDs.add(sc.sequenceFile(inputHDFSPath.toString(), Text.class, Text.class));
+        }
+
+        final JavaPairRDD<Text, Text> allCuboidFile = sc.union(inputRDDs.toArray(new JavaPairRDD[inputRDDs.size()]));
         final JavaPairRDD<RowKeyWritable, KeyValue> hfilerdd;
         if (quickPath) {
             hfilerdd = allCuboidFile.mapToPair(new PairFunction<Tuple2<Text, Text>, RowKeyWritable, KeyValue>() {
@@ -201,6 +217,8 @@ public class SparkCubeHFile extends AbstractApplication implements Serializable 
 
         allCuboidFile.unpersist();
 
+
+        // read partition split keys
         List<RowKeyWritable> keys = new ArrayList<>();
         try (SequenceFile.Reader reader = new SequenceFile.Reader(fs, partitionFilePath, sc.hadoopConfiguration())) {
             RowKeyWritable key = new RowKeyWritable();
@@ -208,7 +226,7 @@ public class SparkCubeHFile extends AbstractApplication implements Serializable 
             while (reader.next(key, value)) {
                 keys.add(key);
                 logger.info(" ------- split key: " + key);
-                key = new RowKeyWritable(); // important, clone a new object!
+                key = new RowKeyWritable(); // important, new an object!
             }
         }
 
@@ -237,12 +255,10 @@ public class SparkCubeHFile extends AbstractApplication implements Serializable 
             logger.debug(ioe.getMessage());
         }
 
-        //        TotalOrderPartitioner.setPartitionFile(job.getConfiguration(), partitionFilePath);
-        //        job.setNumReduceTasks(keys.size() + 1);
         hfilerdd2.saveAsNewAPIHadoopFile(outputPath, ImmutableBytesWritable.class, KeyValue.class,
                 HFileOutputFormat2.class, job.getConfiguration());
 
-        //deleteHDFSMeta(metaUrl);
+        deleteHDFSMeta(metaUrl);
     }
 
     static class HFilePartitioner extends Partitioner {

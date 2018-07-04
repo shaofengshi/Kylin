@@ -19,15 +19,48 @@
 package org.apache.kylin.engine.spark;
 
 import org.apache.kylin.cube.CubeSegment;
-import org.apache.kylin.engine.mr.MRBatchCubingEngine2;
+import org.apache.kylin.cube.model.CubeDesc;
+import org.apache.kylin.cube.model.CubeJoinedFlatTableDesc;
+import org.apache.kylin.engine.IBatchCubingEngine;
 import org.apache.kylin.job.execution.DefaultChainedExecutable;
+import org.apache.kylin.metadata.model.IJoinedFlatTableDesc;
 
 /**
  */
-public class SparkBatchCubingEngine2 extends MRBatchCubingEngine2 {
+public class SparkBatchCubingEngine2 implements IBatchCubingEngine {
+    @Override
+    public IJoinedFlatTableDesc getJoinedFlatTableDesc(CubeDesc cubeDesc) {
+        return new CubeJoinedFlatTableDesc(cubeDesc);
+    }
+
+    @Override
+    public IJoinedFlatTableDesc getJoinedFlatTableDesc(CubeSegment newSegment) {
+        return new CubeJoinedFlatTableDesc(newSegment);
+    }
+
     @Override
     public DefaultChainedExecutable createBatchCubingJob(CubeSegment newSegment, String submitter) {
         return new SparkBatchCubingJobBuilder2(newSegment, submitter).build();
+    }
+
+    @Override
+    public DefaultChainedExecutable createBatchMergeJob(CubeSegment mergeSegment, String submitter) {
+        return new SparkBatchMergeJobBuilder2(mergeSegment, submitter).build();
+    }
+
+    @Override
+    public DefaultChainedExecutable createBatchOptimizeJob(CubeSegment optimizeSegment, String submitter) {
+        return null;
+    }
+
+    @Override
+    public Class<?> getSourceInterface() {
+        return ISparkInput.class;
+    }
+
+    @Override
+    public Class<?> getStorageInterface() {
+        return ISparkOutput.class;
     }
 
 }

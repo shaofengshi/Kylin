@@ -23,8 +23,9 @@ import org.apache.kylin.common.StorageURL;
 import org.apache.kylin.common.util.StringUtil;
 import org.apache.kylin.cube.CubeSegment;
 import org.apache.kylin.engine.EngineFactory;
-import org.apache.kylin.engine.mr.BatchCubingJobBuilder2;
 import org.apache.kylin.engine.mr.CubingJob;
+import org.apache.kylin.engine.mr.JobBuilderSupport;
+import org.apache.kylin.engine.mr.LookupMaterializeContext;
 import org.apache.kylin.job.JoinedFlatTable;
 import org.apache.kylin.job.constant.ExecutableConstants;
 import org.apache.kylin.metadata.model.IJoinedFlatTableDesc;
@@ -36,15 +37,57 @@ import java.util.Map;
 
 /**
  */
-public class SparkBatchCubingJobBuilder2 extends BatchCubingJobBuilder2 {
+public class SparkBatchCubingJobBuilder2 extends JobBuilderSupport {
 
     private static final Logger logger = LoggerFactory.getLogger(SparkBatchCubingJobBuilder2.class);
 
+    private final ISparkInput.ISparkBatchCubingInputSide inputSide;
+    private final ISparkOutput.ISparkBatchCubingOutputSide outputSide;
+
     public SparkBatchCubingJobBuilder2(CubeSegment newSegment, String submitter) {
         super(newSegment, submitter);
+        this.inputSide = SparkUtil.getBatchCubingInputSide(seg);
+        this.outputSide = SparkUtil.getBatchCubingOutputSide(seg);
     }
 
-    @Override
+    public CubingJob build() {
+        logger.info("Spark new job to BUILD segment " + seg);
+
+        final CubingJob result = CubingJob.createBuildJob(seg, submitter, config);
+        final String jobId = result.getId();
+        final String cuboidRootPath = getCuboidRootPath(jobId);
+
+        // Phase 1: Create Flat Table & Materialize Hive View in Lookup Tables
+        inputSide.addStepPhase1_CreateFlatTable(result);
+
+        // Phase 2: Build Dictionary
+        result.addTask(createFactDistinctColumnsStep(jobId));
+
+        if (isEnableUHCDictStep()) {
+            result.addTask(createBuildUHCDictStep(jobId));
+        }
+
+        result.addTask(createBuildDictionaryStep(jobId));
+        result.addTask(createSaveStatisticsStep(jobId));
+
+        // add materialize lookup tables if needed
+        LookupMaterializeContext lookupMaterializeContext = addMaterializeLookupTableSteps(result);
+
+        outputSide.addStepPhase2_BuildDictionary(result);
+
+        // Phase 3: Build Cube
+        addLayerCubingSteps(result, jobId, cuboidRootPath); // layer cubing, only selected algorithm will execute
+        outputSide.addStepPhase3_BuildCube(result);
+
+        // Phase 4: Update Metadata & Cleanup
+        result.addTask(createUpdateCubeInfoAfterBuildStep(jobId, lookupMaterializeContext));
+        inputSide.addStepPhase4_Cleanup(result);
+        outputSide.addStepPhase4_Cleanup(result);
+
+        return result;
+    }
+
+
     protected void addLayerCubingSteps(final CubingJob result, final String jobId, final String cuboidRootPath) {
         final SparkExecutable sparkExecutable = new SparkExecutable();
         sparkExecutable.setClassName(SparkCubingByLayer.class.getName());
@@ -52,10 +95,6 @@ public class SparkBatchCubingJobBuilder2 extends BatchCubingJobBuilder2 {
         result.addTask(sparkExecutable);
     }
 
-    @Override
-    protected void addInMemCubingSteps(final CubingJob result, String jobId, String cuboidRootPath) {
-
-    }
 
     public void configureSparkJob(final CubeSegment seg, final SparkExecutable sparkExecutable,
             final String jobId, final String cuboidRootPath) {
