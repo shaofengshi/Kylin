@@ -314,17 +314,15 @@ public class CubeMigrationCLI extends AbstractApplication {
             throws IOException {
 
         CubeDesc cubeDesc = cube.getDescriptor();
+        String prj = cubeDesc.getProject();
 
         metaResource.add(cube.getResourcePath());
         metaResource.add(cubeDesc.getResourcePath());
         metaResource.add(DataModelDesc.concatResourcePath(cubeDesc.getModelName()));
 
-        for (TableRef tableRef : cubeDesc.getModel().getAllTables()) {
-            //for KYLIN-2717 compatibility, we should use tableRef.getTableDesc().getProject() not cubeDesc.getProject()
-            //if TableDesc.getProject() is null, the table resource path will be old format
-            metaResource.add(TableDesc.concatResourcePath(tableRef.getTableIdentity(), tableRef.getTableDesc().getProject()));
-            metaResource.add(TableExtDesc.concatResourcePath(tableRef.getTableIdentity(), tableRef.getTableDesc().getProject()));
-        }
+        Set<TableRef> tblRefs = cubeDesc.getModel().getAllTables();
+        metaResource.addAll(getCompatibleTablePath(tblRefs, prj, ResourceStore.TABLE_RESOURCE_ROOT));
+        metaResource.addAll(getCompatibleTablePath(tblRefs, prj, ResourceStore.TABLE_EXD_RESOURCE_ROOT));
 
         if (doMigrateSegment) {
             for (CubeSegment segment : cube.getSegments()) {
