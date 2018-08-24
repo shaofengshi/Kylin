@@ -86,6 +86,13 @@ public class ExtractDictionaryFromGlobalMapper<KEYIN, Object> extends KylinMappe
         globalColumnIndex = new int[globalColumns.size()];
         globalColumnValues = Lists.newArrayListWithExpectedSize(globalColumns.size());
 
+        for (int i = 0; i < globalColumns.size(); i++) {
+            TblColRef colRef = globalColumns.get(i);
+            int columnIndexOnFlatTbl = intermediateTableDesc.getColumnIndex(colRef);
+            globalColumnIndex[i] = columnIndexOnFlatTbl;
+            globalColumnValues.add(Sets.<String> newHashSet());
+        }
+
         splitKey = DictionaryGetterUtil.getInputSplitSignature(cubeSeg, context.getInputSplit());
     }
 
@@ -110,13 +117,9 @@ public class ExtractDictionaryFromGlobalMapper<KEYIN, Object> extends KylinMappe
         Path outputDirBase = new Path(context.getConfiguration().get(FileOutputFormat.OUTDIR));
 
         globalDicts = Lists.newArrayListWithExpectedSize(globalColumns.size());
-
         Map<TblColRef, Dictionary<String>> dictionaryMap = cubeSeg.buildDictionaryMap();
         for (int i = 0; i < globalColumns.size(); i++) {
             TblColRef colRef = globalColumns.get(i);
-            int columnIndexOnFlatTbl = intermediateTableDesc.getColumnIndex(colRef);
-            globalColumnIndex[i] = columnIndexOnFlatTbl;
-            globalColumnValues.add(Sets.<String> newHashSet());
             globalDicts.add(dictionaryMap.get(colRef));
         }
 
