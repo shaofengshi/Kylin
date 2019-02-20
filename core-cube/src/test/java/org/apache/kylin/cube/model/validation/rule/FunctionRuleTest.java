@@ -71,7 +71,7 @@ public class FunctionRuleTest extends LocalFileMetadataTestCase {
         MeasureDesc measureDescDuplicated = desc.getMeasures().get(1);
         List<MeasureDesc> newMeasures = Lists.newArrayList(desc.getMeasures());
         newMeasures.add(measureDescDuplicated);
-        desc.setMeasures(newMeasures);
+        desc.setOuterMeasures(newMeasures);
 
         desc.init(config);
     }

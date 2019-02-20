@@ -19,12 +19,15 @@
 package org.apache.kylin.metadata.model;
 
 import java.io.Serializable;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.Lists;
 
 /**
  */
@@ -41,6 +44,39 @@ public class MeasureDesc implements Serializable {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @Deprecated
     private String dependentMeasureRef;
+
+    public List<MeasureDesc> getInternalMeasure(List<MeasureDesc> outerMeasures) {
+        List<FunctionDesc> functionDescs = function.getMeasureType().convertToInternalMeasures(function);
+        if (functionDescs.size() == 1)
+            return Lists.newArrayList(this);
+
+        // remove dup with known outer measures
+        Iterator<FunctionDesc> it = functionDescs.iterator();
+        while (it.hasNext()) {
+            FunctionDesc internal = it.next();
+            for (MeasureDesc outer : outerMeasures) {
+                if (outer != this && outer.function.equals(internal)) {
+                    it.remove();
+                    break;
+                }
+            }
+        }
+
+        if (functionDescs.size() == 1 && this.function.equals(functionDescs.get(0))) {
+            return Lists.newArrayList(this);
+        }
+
+        List<MeasureDesc> implementMeasures = Lists.newArrayList();
+        int i = 0;
+        for (FunctionDesc functionDesc : functionDescs) {
+            MeasureDesc desc = new MeasureDesc();
+            desc.setFunction(functionDesc);
+            desc.setName(name + "_" + i++);
+            desc.setDependentMeasureRef(dependentMeasureRef);
+            implementMeasures.add(desc);
+        }
+        return implementMeasures;
+    }
 
     public String getName() {
         return name;

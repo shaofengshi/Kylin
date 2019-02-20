@@ -18,6 +18,7 @@
 
 package org.apache.kylin.measure;
 
+import com.google.common.collect.Lists;
 import org.apache.kylin.common.util.Dictionary;
 import org.apache.kylin.metadata.model.FunctionDesc;
 import org.apache.kylin.metadata.model.MeasureDesc;
@@ -48,6 +49,14 @@ abstract public class MeasureType<T> implements java.io.Serializable {
     /** Validates a user defined FunctionDesc has expected parameter etc. Throw IllegalArgumentException if anything wrong. */
     public void validate(FunctionDesc functionDesc) throws IllegalArgumentException {
         return;
+    }
+
+    /**
+     * A user defined measure (outer measure) could translate into one or more internal measures which are the
+     * actual measures get computed and stored in cube.
+     */
+    public List<FunctionDesc> convertToInternalMeasures(FunctionDesc functionDesc) {
+        return Lists.newArrayList(functionDesc);
     }
 
     /** Although most aggregated object takes only 8 bytes like long or double, 

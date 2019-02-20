@@ -51,6 +51,9 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.collect.Lists;
 
+import static org.apache.kylin.metadata.model.FunctionDesc.FUNC_SUM;
+
+@SuppressWarnings("serial")
 public class TopNMeasureType extends MeasureType<TopNCounter<ByteArray>> {
 
     private static final Logger logger = LoggerFactory.getLogger(TopNMeasureType.class);
@@ -62,6 +65,8 @@ public class TopNMeasureType extends MeasureType<TopNCounter<ByteArray>> {
     public static final String CONFIG_ENCODING_VERSION_PREFIX = "topn.encoding_version.";
     public static final String CONFIG_AGG = "topn.aggregation";
     public static final String CONFIG_ORDER = "topn.order";
+    public static final int MAX_PRECISION = 38;
+    public static final int MIN_PRECISION = 19;
 
     public static class Factory extends MeasureTypeFactory<TopNCounter<ByteArray>> {
 
@@ -108,6 +113,43 @@ public class TopNMeasureType extends MeasureType<TopNCounter<ByteArray>> {
 
         if (dataType.getPrecision() < 1 || dataType.getPrecision() > 10000)
             throw new IllegalArgumentException();
+    }
+
+    // TopN requires a Sum to work
+    @Override
+    public List<FunctionDesc> convertToInternalMeasures(FunctionDesc topN) {
+        ParameterDesc firstParam = topN.getParameter();
+        if (!firstParam.isColumnType())
+            return super.convertToInternalMeasures(topN);
+
+        TblColRef sumCol = firstParam.getColRef();
+        FunctionDesc sum = FunctionDesc.newInstance(FUNC_SUM, ParameterDesc.newInstance(sumCol), sumReturnType(sumCol));
+        return Lists.newArrayList(topN, sum);
+    }
+
+    private String sumReturnType(TblColRef sumCol) {
+        if (sumCol.getType().isIntegerFamily()) {
+            return "bigint";
+        } else if (sumCol.getType().isDecimal()) {
+            return rewriteDataType(sumCol.getDatatype());
+        } else {
+            return "double";
+        }
+    }
+
+    private String rewriteDataType(String dataType) {
+        DataType result = DataType.getType(dataType);
+        if(null == result){
+            throw new RuntimeException("TopNMeasureType rewriteDataType error, dataType string : " + dataType);
+        }
+        int precision = result.getPrecision();
+        if(precision > MIN_PRECISION){
+            precision = Math.min(result.getPrecision(), MAX_PRECISION);
+        } else {
+            precision = MIN_PRECISION;
+        }
+        result = new DataType(result.getName(), precision, result.getScale());
+        return result.toString();
     }
 
     @Override

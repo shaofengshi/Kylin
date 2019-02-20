@@ -621,10 +621,10 @@ public class CubeController extends BasicController {
                 throw new BadRequestException("column family lack measure:" + measureDesc.getName());
             }
         }
-        if (cubeDesc.getMeasures().size() != columnFamilyMetricsSet.size()) {
-            throw new BadRequestException(
-                    "the number of input measure and the number of measure defined in cubedesc are not consistent");
-        }
+//        if (cubeDesc.getMeasures().size() != columnFamilyMetricsSet.size()) {
+//            throw new BadRequestException(
+//                    "the number of input measure and the number of measure defined in cubedesc are not consistent");
+//        }
     }
 
     /**
