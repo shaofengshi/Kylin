@@ -36,7 +36,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.I0Itec.zkclient.ZkConnection;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.curator.framework.CuratorFramework;
 import org.apache.kafka.common.requests.MetadataResponse;
 import org.apache.kylin.common.KylinConfig;
 import org.apache.kylin.common.util.ClassUtil;
@@ -323,20 +322,8 @@ public class BuildCubeWithStream {
 
     public void after() {
         kafkaServer.stop();
-        cleanKafkaZkPath(kafkaZkPath);
+        ZKUtil.cleanZkPath(kafkaZkPath);
         DefaultScheduler.destroyInstance();
-    }
-
-    private void cleanKafkaZkPath(String path) {
-        CuratorFramework zkClient = ZKUtil.newZookeeperClient();
-
-        try {
-            zkClient.delete().deletingChildrenIfNeeded().forPath(kafkaZkPath);
-        } catch (Exception e) {
-            logger.warn("Failed to delete zookeeper path: " + path, e);
-        } finally {
-            zkClient.close();
-        }
     }
 
     protected void waitForJob(String jobId) {

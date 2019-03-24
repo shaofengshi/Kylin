@@ -40,6 +40,7 @@ import org.apache.kylin.common.util.ClassUtil;
 import org.apache.kylin.common.util.HBaseMetadataTestCase;
 import org.apache.kylin.common.util.HadoopUtil;
 import org.apache.kylin.common.util.RandomUtil;
+import org.apache.kylin.common.util.ZKUtil;
 import org.apache.kylin.cube.CubeInstance;
 import org.apache.kylin.cube.CubeManager;
 import org.apache.kylin.engine.mr.CubingJob;
@@ -54,8 +55,7 @@ import org.apache.kylin.metadata.realization.RealizationStatusEnum;
 import org.apache.kylin.provision.MockKafka;
 import org.apache.kylin.query.KylinTestBase;
 import org.apache.kylin.rest.job.StorageCleanupJob;
-import org.apache.kylin.storage.hbase.util.ZookeeperJobLock;
-import org.apache.kylin.storage.hbase.util.ZookeeperUtil;
+import org.apache.kylin.job.lock.zookeeper.ZookeeperJobLock;
 import org.apache.kylin.stream.coordinator.Coordinator;
 import org.apache.kylin.stream.coordinator.ZKUtils;
 import org.apache.kylin.stream.core.client.ReceiverAdminClient;
@@ -290,7 +290,7 @@ public class BuildCubeWithStreamV2 extends KylinTestBase {
         coordinator.unAssignCube(CUBE_NAME);
         streamingServer.removeFromReplicaSet();
         kafkaServer.stop();
-        ZookeeperUtil.cleanZkPath(kafkaZkPath);
+        ZKUtil.cleanZkPath(kafkaZkPath);
         DefaultScheduler.destroyInstance();
     }
 
@@ -335,9 +335,7 @@ public class BuildCubeWithStreamV2 extends KylinTestBase {
     }
 
     private void startEmbeddedKafka(String topicName, String server, int brokerId) {
-        String zkConnectionStr = ZookeeperUtil.getZKConnectString() + kafkaZkPath;
-        logger.info("zkConnectionStr: {}" + zkConnectionStr);
-        ZkConnection zkConnection = new ZkConnection(zkConnectionStr);
+        ZkConnection zkConnection = new ZkConnection(ZKUtil.getZKConnectString(KylinConfig.getInstanceFromEnv()));
 
         // start kafka server
         kafkaServer = new MockKafka(zkConnection, server, brokerId);
@@ -358,7 +356,7 @@ public class BuildCubeWithStreamV2 extends KylinTestBase {
     }
 
     public static void cleanStreamZkRoot() {
-        ZookeeperUtil.cleanZkPath(ZKUtils.ZK_ROOT);
+        ZKUtil.cleanZkPath(ZKUtils.ZK_ROOT);
     }
 
     public static void main(String[] args) {
