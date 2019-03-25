@@ -289,7 +289,10 @@ public class BuildCubeWithStreamV2 extends KylinTestBase {
     public void after() throws Exception {
         coordinator.unAssignCube(CUBE_NAME);
         streamingServer.removeFromReplicaSet();
-        kafkaServer.stop();
+        if (kafkaServer != null) {
+            kafkaServer.stop();
+
+        }
         ZKUtil.cleanZkPath(kafkaZkPath);
         DefaultScheduler.destroyInstance();
     }
@@ -335,7 +338,7 @@ public class BuildCubeWithStreamV2 extends KylinTestBase {
     }
 
     private void startEmbeddedKafka(String topicName, String server, int brokerId) {
-        ZkConnection zkConnection = new ZkConnection(ZKUtil.getZKConnectString(KylinConfig.getInstanceFromEnv()));
+        ZkConnection zkConnection = new ZkConnection(ZKUtil.getZKConnectString(KylinConfig.getInstanceFromEnv()) + kafkaZkPath);
 
         // start kafka server
         kafkaServer = new MockKafka(zkConnection, server, brokerId);
