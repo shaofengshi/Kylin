@@ -88,6 +88,7 @@ public class BuildCubeWithStream {
     private KafkaConfig kafkaConfig;
     private MockKafka kafkaServer;
     private ZkConnection zkConnection;
+    private final String kafkaZkPath = "/kylin/streaming/" + RandomUtil.randomUUID().toString();
     protected static boolean fastBuildMode = false;
     private volatile boolean generateData = true;
     private volatile boolean generateDataDone = false;
@@ -131,7 +132,7 @@ public class BuildCubeWithStream {
 
     private void startEmbeddedKafka(String topicName, BrokerConfig brokerConfig) {
         //Start mock Kakfa
-        String zkConnectionStr = ZKUtil.getZKConnectString(KylinConfig.getInstanceFromEnv());
+        String zkConnectionStr = ZKUtil.getZKConnectString(KylinConfig.getInstanceFromEnv()) + kafkaZkPath;
         System.out.println("zkConnectionStr" + zkConnectionStr);
         zkConnection = new ZkConnection(zkConnectionStr);
         // Assert.assertEquals(ZooKeeper.States.CONNECTED, zkConnection.getZookeeperState());
@@ -322,6 +323,7 @@ public class BuildCubeWithStream {
         if (kafkaServer != null) {
             kafkaServer.stop();
         }
+        ZKUtil.cleanZkPath(kafkaZkPath);
         DefaultScheduler.destroyInstance();
     }
 
