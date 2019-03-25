@@ -299,8 +299,8 @@ public class BuildCubeWithStream {
 
     protected void deployEnv() throws Exception {
         DeployUtil.overrideJobJarLocations();
-        DeployUtil.initCliWorkDir();
-        DeployUtil.deployMetadata();
+//        DeployUtil.initCliWorkDir();
+//        DeployUtil.deployMetadata();
 
         // prepare test data for joined lookup table
         DeployUtil.deployTablesInModelWithExclusiveTables("test_streaming_join_table_model", new String[]{"DEFAULT.STREAMING_TABLE"});
